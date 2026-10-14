@@ -363,32 +363,40 @@ function errorSumaParcial(pts, coef, M) {
 
 /* ==== FIGURAS ==== */
 
-/* Bicicleta como UN solo trazo continuo: todos los enlaces entre piezas son
-   tramos cortos del propio cuadro (radios, tubos), así la serie de Fourier no
-   tiene que "saltar" y no aparecen bucles parásitos. */
-function biciTrazos() {
-  const Br = [-105, 143], hubR = [-105, 55];        // rueda trasera
-  const BB = [0, 55], S = [-45, -85], Stip = [-72, -93];
-  const H = [95, -70], Hb1 = [118, -106], Hb2 = [82, -100];
-  const F = [105, 55], Bf = [105, 143];             // rueda delantera
+/* Bicicleta como UN solo trazo continuo, en diamante completo.
+   Recorrido: sillín → tubo de sillín → pedalier → tubo diagonal → manubrio →
+   horquilla → rueda delantera (entrando y saliendo por un radio) → horquilla →
+   tubo superior → sillín → vaina superior → rueda trasera (por un radio) →
+   vaina inferior → tubo de sillín. Empieza y termina en el sillín, así el
+   segmento de cierre mide cero y no hay diagonales parásitas. */
+function biciTrazos(terminarEnSillin) {
+  const S = [-45, -85], Stip = [-72, -93];                    // sillín
+  const H = [95, -70], Hb1 = [118, -106], Hb2 = [82, -100];   // dirección y manubrio
+  const BB = [0, 55], R = [-105, 55], Br = [-105, 143];       // pedalier y rueda trasera
+  const F = [105, 55], Bf = [105, 143];                       // rueda delantera
   const lin = (a, b, n) => sampleLine(a[0], a[1], b[0], b[1], n || 16);
   const t = [];
-  t.push(sampleArc(BB[0], BB[1], 18, 0, TAU, 44));  // piñón
-  t.push(lin([18, 55], BB, 5));                     // cierra el piñón
-  t.push(lin(BB, Br));                              // tirante hacia la rueda trasera
-  t.push(sampleArc(-105, 55, 88, Math.PI / 2, Math.PI / 2 + TAU, 170)); // rueda trasera
-  t.push(lin(Br, hubR, 8));                         // radio
-  t.push(lin(hubR, S));                             // vaina superior
-  t.push(lin(S, Stip, 8));                          // silla
-  t.push(lin(Stip, S, 8));
   t.push(lin(S, BB));                               // tubo de sillín
+  t.push(sampleArc(BB[0], BB[1], 18, 0, TAU, 48));  // piñón
+  t.push(lin([18, 55], BB, 5));                     // cierra el piñón
   t.push(lin(BB, H));                               // tubo diagonal
-  t.push(lin(H, Hb1, 9));                           // manubrio
+  t.push(lin(H, Hb1, 9));                           // manubrio (ida)
   t.push(lin(Hb1, Hb2, 9));
-  t.push(lin(Hb2, H, 9));
+  t.push(lin(Hb2, H, 9));                           // manubrio (vuelta)
   t.push(lin(H, F));                                // horquilla
-  t.push(lin(F, Bf, 8));                            // radio
-  t.push(sampleArc(105, 55, 88, Math.PI / 2, Math.PI / 2 + TAU, 170)); // rueda delantera
+  t.push(lin(F, Bf, 8));                            // radio (baja)
+  t.push(sampleArc(105, 55, 88, Math.PI / 2, Math.PI / 2 + TAU, 180)); // rueda delantera
+  t.push(lin(Bf, F, 8));                            // radio (sube)
+  t.push(lin(F, H));                                // horquilla (vuelta)
+  t.push(lin(H, S));                                // tubo superior
+  t.push(lin(S, Stip, 8));                          // silla (ida)
+  t.push(lin(Stip, S, 8));                          // silla (vuelta)
+  t.push(lin(S, R));                                // vaina superior
+  t.push(lin(R, Br, 8));                            // radio (baja)
+  t.push(sampleArc(-105, 55, 88, Math.PI / 2, Math.PI / 2 + TAU, 180)); // rueda trasera
+  t.push(lin(Br, R, 8));                            // radio (sube)
+  t.push(lin(R, BB));                               // vaina inferior
+  if (!terminarEnSillin) t.push(lin(BB, S));        // tubo de sillín (cierra el cuadro)
   return t;
 }
 
@@ -397,21 +405,34 @@ const FIGURAS = {
     return biciTrazos();
   },
   pelicano() {
-    // Silueta del ave en UN solo trazo cerrado, empezando por el vientre (que es
-    // lo más cercano a la bicicleta): pico, ojo, nuca, espalda, cola y el ala
-    // como lóbulo. Las "patas" son los enlaces entre el ave y los pedales, así
-    // que la figura completa es prácticamente un único trazo continuo.
+    // Silueta del ave en UN solo trazo cerrado que ARRANCA Y TERMINA EN EL
+    // SILLÍN [-45,-85], de modo que el ave descansa sobre el asiento y no queda
+    // flotando. Recorre: pecho, cuello en S, cresta, bucle del ojo, pico
+    // entreabierto con su bolsa gular, garganta, espalda, cola y el ala
+    // extendida con seis plumas primarias.
     const ave = splineCerrada([
-      [-4, -112], [34, -146], [52, -172], [80, -216], [112, -228], [134, -232],
-      [190, -240], [150, -248], [120, -260], [106, -245], [97, -256], [74, -248],
-      [32, -222], [-12, -188], [-60, -172], [-108, -182], [-150, -146], [-104, -120],
-      [-50, -114], [30, -138], [-6, -176], [-46, -142], [-6, -126]
-    ], 320);
+      [-45, -85], [4, -94], [44, -118], [66, -156], [80, -200], [92, -236],
+      [106, -252], [124, -246], [118, -232], [108, -242], [134, -240], [186, -226],
+      [152, -214], [140, -224], [154, -206], [120, -202], [92, -192], [62, -166],
+      [26, -146], [-18, -136], [-66, -140], [-122, -156], [-168, -122], [-126, -94],
+      [-76, -90], [-30, -112], [-2, -144], [-20, -152], [-40, -162], [-58, -166],
+      [-76, -176], [-92, -174], [-106, -182], [-118, -172], [-130, -178], [-138, -164],
+      [-152, -166], [-150, -146], [-118, -128], [-64, -104]
+    ], 440);
+    // Patas palmeadas: bajan del vientre a los pedales y el pie se dibuja como
+    // un pequeño triángulo (membrana).
+    const pierna = (x0, x1) => [
+      sampleLine(x0, -90, x0 + 6, -20, 18),        // muslo
+      sampleLine(x0 + 6, -20, x1, 42, 16),         // caña
+      sampleLine(x1, 42, x1 + 16, 48, 6),          // membrana (ida)
+      sampleLine(x1 + 16, 48, x1 - 2, 56, 6),
+      sampleLine(x1 - 2, 56, x1, 42, 6)            // vuelve al tobillo
+    ];
     return [
-      ave,
-      sampleLine(-4, -112, 0, 50, 26),     // pata que baja al pedal
-      ...biciTrazos(),                     // la bicicleta, en un solo trazo
-      sampleLine(0, 55, 4, -110, 26)       // segunda pata: sube y cierra la figura
+      ...pierna(-14, -2),
+      ...pierna(4, 14),
+      ...biciTrazos(true),   // la bicicleta; termina en el sillín
+      ave                    // el ave, que empieza y termina en el sillín
     ];
   },
   corazon() {
@@ -646,10 +667,12 @@ function render() {
     ctx.stroke();
   }
 
-  // Trazo dibujado por la punta
+  // Trazo dibujado por la punta. El rastro se limita a UN ciclo completo, para
+  // que al cambiar la velocidad no queden vueltas antiguas acumuladas.
+  const maxRastro = Math.ceil(1200 / Math.max(0.1, velocidad)) + 8;
   if (jugando) {
     rastro.push([x, y]);
-    if (rastro.length > 4000) rastro.shift();
+    while (rastro.length > maxRastro) rastro.shift();
   }
   if (rastro.length > 1) {
     ctx.beginPath();
@@ -661,6 +684,18 @@ function render() {
     ctx.shadowColor = '#00f2fe'; ctx.shadowBlur = 12;
     ctx.stroke();
     ctx.shadowBlur = 0;
+  }
+
+  // Trazo en vivo del modo dibujo: se ve la línea mientras se arrastra el ratón
+  if (dibujando && trazos[0] && trazos[0].length > 1) {
+    const viva = trazos[0];
+    ctx.beginPath();
+    ctx.moveTo(viva[0][0], viva[0][1]);
+    for (let i = 1; i < viva.length; i++) ctx.lineTo(viva[i][0], viva[i][1]);
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 2.2 / escala;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.stroke();
   }
 
   // Punta
@@ -691,6 +726,11 @@ btnReset.addEventListener('click', () => { t = 0; rastro = []; });
 
 btnDibujar.addEventListener('click', () => {
   modoDibujo = true;
+  // El trazo se captura en coordenadas de la vista completa: se desactiva el
+  // seguimiento de la punta para que lo dibujado coincida con lo que se ve.
+  seguir = false;
+  btnCamCompleta.classList.add('activo');
+  btnCamSeguir.classList.remove('activo');
   btnDibujar.classList.add('activo');
   btnDibujar.textContent = '✎ Dibuje en el lienzo…';
   pista.innerHTML = '<b>Modo dibujo:</b> mantenga presionado el botón del ratón (o arrastre el dedo) ' +
