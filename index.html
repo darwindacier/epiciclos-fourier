@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Epiciclos de Fourier — laboratorio interactivo</title>
+<style>
+  :root{
+    --fondo:#060a17; --panel:rgba(12,19,38,.92); --borde:rgba(0,242,254,.25);
+    --cian:#00f2fe; --oro:#ffd166; --texto:#e2e8f0; --tenue:#94a3b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--fondo); color:var(--texto); height:100vh; width:100vw;
+    overflow:hidden; display:flex; flex-direction:column;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    flex-wrap:wrap; padding:10px 18px; background:rgba(8,13,28,.95);
+    border-bottom:1px solid var(--borde); z-index:10;
+  }
+  h1{
+    font-size:1.05rem; font-weight:700; letter-spacing:.02em;
+    background:linear-gradient(90deg,var(--cian),var(--oro));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .formula{
+    font-family:'Cambria Math','Times New Roman',serif; font-style:italic; font-size:.92rem;
+    color:var(--oro); background:rgba(255,209,102,.1);
+    border:1px solid rgba(255,209,102,.3); padding:4px 10px; border-radius:6px;
+  }
+  .stats{display:flex; gap:16px; font-size:.82rem; color:var(--tenue); flex-wrap:wrap}
+  .stats b{color:var(--cian); font-family:ui-monospace,Consolas,monospace; font-size:.9rem}
+  .obra{display:flex; flex:1; overflow:hidden}
+  .lienzo{
+    flex:1; position:relative; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at center,#0b132b 0%,#050814 100%); overflow:hidden;
+  }
+  canvas{display:block; width:100%; height:100%; cursor:crosshair}
+  .pista{
+    position:absolute; bottom:14px; left:14px; max-width:60%;
+    background:rgba(8,13,28,.86); border:1px solid var(--borde); border-radius:8px;
+    padding:8px 13px; font-size:.79rem; color:var(--tenue); pointer-events:none;
+  }
+  aside{
+    width:350px; background:var(--panel); border-left:1px solid var(--borde);
+    padding:14px; overflow-y:auto; display:flex; flex-direction:column; gap:12px;
+  }
+  .tarjeta{
+    background:rgba(15,23,42,.75); border:1px solid rgba(148,163,184,.16);
+    border-radius:10px; padding:12px 13px; display:flex; flex-direction:column; gap:9px;
+  }
+  .tarjeta h2{
+    font-size:.74rem; text-transform:uppercase; letter-spacing:.08em; color:var(--cian);
+  }
+  .fila{display:flex; gap:7px; flex-wrap:wrap}
+  button{
+    flex:1; min-width:56px; background:rgba(0,242,254,.12); color:var(--texto);
+    border:1px solid rgba(0,242,254,.35); padding:8px 9px; border-radius:7px;
+    font-size:.8rem; font-weight:600; cursor:pointer; transition:all .15s ease;
+  }
+  button:hover{background:rgba(0,242,254,.25); border-color:var(--cian)}
+  button.activo{background:linear-gradient(135deg,var(--cian),#0284c7); color:#040814; border-color:transparent}
+  button.oro{background:rgba(255,209,102,.14); border-color:rgba(255,209,102,.45); color:var(--oro)}
+  button.oro.activo{background:var(--oro); color:#050814}
+  button.mini{font-size:.72rem; padding:5px 6px; background:rgba(30,41,59,.8); border-color:rgba(148,163,184,.25)}
+  select{
+    width:100%; background:rgba(30,41,59,.9); color:var(--texto);
+    border:1px solid rgba(148,163,184,.3); border-radius:7px; padding:8px; font-size:.85rem;
+  }
+  .deslizador{display:flex; flex-direction:column; gap:5px}
+  .etiqueta{display:flex; justify-content:space-between; font-size:.82rem; color:var(--tenue)}
+  .etiqueta b{color:var(--oro); font-family:ui-monospace,Consolas,monospace}
+  input[type=range]{width:100%; accent-color:var(--cian); cursor:pointer}
+  .casillas{display:flex; flex-direction:column; gap:7px; font-size:.82rem}
+  .casillas label{display:flex; align-items:center; gap:8px; cursor:pointer}
+  .casillas input{accent-color:var(--cian); width:15px; height:15px}
+  table{width:100%; border-collapse:collapse; font-size:.75rem; font-family:ui-monospace,Consolas,monospace}
+  th{text-align:left; color:var(--tenue); padding:4px 6px; border-bottom:1px solid rgba(148,163,184,.2)}
+  td{padding:3px 6px; border-bottom:1px solid rgba(148,163,184,.08)}
+  .nota{font-size:.74rem; color:var(--tenue); line-height:1.5}
+  .nota code{color:var(--oro); font-family:ui-monospace,Consolas,monospace}
+  @media (max-width:900px){
+    .obra{flex-direction:column}
+    aside{width:100%; height:46%; border-left:none; border-top:1px solid var(--borde)}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <h1>Epiciclos de Fourier</h1>
+    <span class="formula">f(t) = &sum; c<sub>n</sub> · e<sup>i·n·&omega;·t</sup></span>
+  </div>
+  <div class="stats">
+    <span>Epiciclos: <b id="eEpis">0</b></span>
+    <span>Energ&iacute;a (Parseval): <b id="eEner">0%</b></span>
+    <span>Error de la suma parcial: <b id="eError">0</b></span>
+    <span>Fase t: <b id="eFase">0.00</b></span>
+    <span>Avance: <b id="eAvance">0%</b></span>
+  </div>
+</header>
+
+<div class="obra">
+  <div class="lienzo">
+    <canvas id="cv"></canvas>
+    <div class="pista" id="pista">
+      Cada c&iacute;rculo gira a frecuencia entera <b>n</b>; encadenando sus vectores, la punta
+      dibuja la figura con una sola l&iacute;nea continua. Use <b>Dibujar</b> para trazar su propia curva.
+    </div>
+  </div>
+
+  <aside>
+    <div class="tarjeta">
+      <h2>Reproducci&oacute;n</h2>
+      <div class="fila">
+        <button id="btnPlay" class="activo">&#10074;&#10074; Pausar</button>
+        <button id="btnReset">&#8635; Reiniciar</button>
+      </div>
+      <div class="fila">
+        <button id="btnDibujar" class="oro">&#9998; Dibujar mi trazo</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Figura</h2>
+      <select id="selFigura">
+        <option value="pelicano">Pel&iacute;cano en bicicleta</option>
+        <option value="bicicleta">Bicicleta</option>
+        <option value="corazon">Coraz&oacute;n</option>
+        <option value="estrella">Estrella</option>
+        <option value="infinito">Infinito</option>
+        <option value="cardioide">Cardioide</option>
+        <option value="rosa">Rosa de 5 p&eacute;talos</option>
+        <option value="cuadrado">Cuadrado redondeado</option>
+      </select>
+      <div class="nota">
+        N&uacute;mero de puntos de la curva: <b id="ePuntos">0</b>. Los coeficientes c<sub>n</sub>
+        se calculan con la DFT en este navegador (no hay datos precalculados).
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Complejidad de la serie</h2>
+      <div class="deslizador">
+        <div class="etiqueta"><span>N&uacute;mero de epiciclos (M)</span><b id="eM">0</b></div>
+        <input type="range" id="rangoM" min="2" max="200" value="120" step="1" />
+      </div>
+      <div class="fila">
+        <button class="mini" data-m="6">6</button>
+        <button class="mini" data-m="12">12</button>
+        <button class="mini" data-m="40">40</button>
+        <button class="mini" data-m="120">120</button>
+        <button class="mini" data-m="9999">M&aacute;x</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Velocidad y c&aacute;mara</h2>
+      <div class="deslizador">
+        <div class="etiqueta"><span>Velocidad de giro</span><b id="eVel">1.00x</b></div>
+        <input type="range" id="rangoVel" min="0.1" max="3" value="1" step="0.05" />
+      </div>
+      <div class="fila">
+        <button id="btnCamCompleta" class="activo">Vista completa</button>
+        <button id="btnCamSeguir">&#128269; Seguir punta (x3.5)</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Capas visuales</h2>
+      <div class="casillas">
+        <label><input type="checkbox" id="cCirculos" checked /> C&iacute;rculos (epiciclos)</label>
+        <label><input type="checkbox" id="cVectores" checked /> Vectores radiales</label>
+        <label><input type="checkbox" id="cFigura" checked /> Figura objetivo tenue</label>
+        <label><input type="checkbox" id="cRejilla" checked /> Plano complejo (X, Y)</label>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Arm&oacute;nicos principales (mayor |c<sub>n</sub>|)</h2>
+      <table>
+        <thead><tr><th>Frec. n</th><th>Radio |c<sub>n</sub>|</th><th>Fase &phi;<sub>n</sub></th></tr></thead>
+        <tbody id="tabla"></tbody>
+      </table>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Nota matem&aacute;tica</h2>
+      <div class="nota">
+        La curva se muestrea en <code>N</code> puntos y se calcula
+        <code>c<sub>n</sub> = (1/N) &sum; p<sub>k</sub> e<sup>&minus;2&pi;i n k/N</sup></code>,
+        con <code>n = &minus;N/2 ... N/2</code>. Se ordenan por radio y se animan los <code>M</code>
+        mayores: la suma parcial es la curva reconstruida.<br /><br />
+        <b>Energ&iacute;a</b>: &sum;|c<sub>n</sub>|<sup>2</sup> de los activos sobre el total (Parseval).<br />
+        <b>Error</b>: distancia media, en p&iacute;xeles, entre la figura y la suma parcial con
+        <code>M</code> arm&oacute;nicos. Al aumentar <code>M</code> el error baja: eso es la
+        convergencia de la serie de Fourier.<br /><br />
+        Atajos: <code>espacio</code> pausa, <code>R</code> reinicia, <code>D</code> modo dibujo.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* ==== MATH:BEGIN ==== */
+const TAU = Math.PI * 2;
+
+function sampleLine(x0, y0, x1, y1, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const s = i / n;
+    pts.push([x0 + (x1 - x0) * s, y0 + (y1 - y0) * s]);
+  }
+  return pts;
+}
+
+function sampleArc(cx, cy, rx, a0, a1, n, ry) {
+  const RY = (ry === undefined) ? rx : ry;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = a0 + (a1 - a0) * (i / n);
+    pts.push([cx + rx * Math.cos(a), cy + RY * Math.sin(a)]);
+  }
+  return pts;
+}
+
+function sampleCubic(p0, p1, p2, p3, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / n, u = 1 - t;
+    const x = u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0];
+    const y = u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1];
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+/* Curva cerrada suave (Catmull-Rom) que pasa por todos los puntos de control.
+   Sirve para dibujar siluetas de un solo trazo, como el pelícano. */
+function splineCerrada(ctrl, n) {
+  const m = ctrl.length;
+  const porTramo = Math.max(4, Math.round(n / m));
+  const pts = [];
+  for (let i = 0; i < m; i++) {
+    const p0 = ctrl[(i - 1 + m) % m], p1 = ctrl[i];
+    const p2 = ctrl[(i + 1) % m], p3 = ctrl[(i + 2) % m];
+    for (let k = 0; k < porTramo; k++) {
+      const t = k / porTramo, t2 = t * t, t3 = t2 * t;
+      const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t +
+                (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+                (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+      const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t +
+                (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+                (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+      pts.push([x, y]);
+    }
+  }
+  return pts;
+}
+
+/* Encadena varios trazos y los reparte uniformemente por longitud de arco,
+   de modo que la DFT reciba N puntos equiespaciados de una curva cerrada. */
+function muestrearCerrada(trazos, N) {
+  const bruto = [];
+  for (const trazo of trazos) {
+    for (const p of trazo) bruto.push(p);
+  }
+  const m = bruto.length;
+  if (m < 3) return bruto.slice();
+  const largos = new Array(m);
+  let total = 0;
+  for (let i = 0; i < m; i++) {
+    const a = bruto[i], b = bruto[(i + 1) % m];
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    largos[i] = d; total += d;
+  }
+  if (total === 0) return bruto.slice(0, N);
+  const paso = total / N;
+  const salida = [];
+  let seg = 0, acumulado = 0;
+  for (let i = 0; i < N; i++) {
+    const objetivo = i * paso;
+    while (seg < m - 1 && acumulado + largos[seg] < objetivo) {
+      acumulado += largos[seg]; seg++;
+    }
+    const a = bruto[seg], b = bruto[(seg + 1) % m];
+    const f = largos[seg] > 0 ? (objetivo - acumulado) / largos[seg] : 0;
+    salida.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+  }
+  return salida;
+}
+
+/* Centra y escala la figura dentro de una caja cuadrada. */
+function normalizar(trazos, caja) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const trazo of trazos) {
+    for (const p of trazo) {
+      if (p[0] < x0) x0 = p[0];
+      if (p[0] > x1) x1 = p[0];
+      if (p[1] < y0) y0 = p[1];
+      if (p[1] > y1) y1 = p[1];
+    }
+  }
+  const w = x1 - x0, h = y1 - y0;
+  const escala = caja / Math.max(w, h, 1e-6);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  return trazos.map(trazo => trazo.map(p => [(p[0] - cx) * escala, (p[1] - cy) * escala]));
+}
+
+/* DFT: c_n = (1/N) sum_k p_k e^{-2 pi i n k / N}, ordenada por radio descendente.
+   Se usa n = -N/2 ... N/2-1 (N frecuencias distintas: la de Nyquist no se repite),
+   de modo que la serie con todos los armónicos reconstruye la curva exactamente. */
+function dft(pts) {
+  const N = pts.length;
+  const mitad = Math.floor(N / 2);
+  const coef = [];
+  for (let n = -mitad; n < mitad; n++) {
+    let re = 0, im = 0;
+    for (let k = 0; k < N; k++) {
+      const a = (TAU * n * k) / N;
+      const c = Math.cos(a), s = Math.sin(a);
+      re += pts[k][0] * c + pts[k][1] * s;
+      im += -pts[k][0] * s + pts[k][1] * c;
+    }
+    re /= N; im /= N;
+    coef.push({ n, re, im, amp: Math.hypot(re, im), fase: Math.atan2(im, re) });
+  }
+  coef.sort((a, b) => b.amp - a.amp);
+  return coef;
+}
+
+function energiaPct(coef, M) {
+  let total = 0, activa = 0;
+  for (let i = 0; i < coef.length; i++) {
+    const e = coef[i].amp * coef[i].amp;
+    total += e;
+    if (i < M) activa += e;
+  }
+  return total > 0 ? (activa / total) * 100 : 100;
+}
+
+/* Distancia media entre la figura y su suma parcial con M armónicos. */
+function errorSumaParcial(pts, coef, M) {
+  const N = pts.length;
+  const usar = coef.slice(0, Math.min(M, coef.length));
+  let suma = 0;
+  for (let k = 0; k < N; k++) {
+    const t = (TAU * k) / N;
+    let x = 0, y = 0;
+    for (const c of usar) {
+      const a = c.n * t;
+      const cs = Math.cos(a), sn = Math.sin(a);
+      x += c.re * cs - c.im * sn;
+      y += c.re * sn + c.im * cs;
+    }
+    suma += Math.hypot(x - pts[k][0], y - pts[k][1]);
+  }
+  return suma / N;
+}
+/* ==== MATH:END ==== */
+
+/* ==== FIGURAS ==== */
+
+/* Bicicleta como UN solo trazo continuo: todos los enlaces entre piezas son
+   tramos cortos del propio cuadro (radios, tubos), así la serie de Fourier no
+   tiene que "saltar" y no aparecen bucles parásitos. */
+function biciTrazos() {
+  const Br = [-105, 143], hubR = [-105, 55];        // rueda trasera
+  const BB = [0, 55], S = [-45, -85], Stip = [-72, -93];
+  const H = [95, -70], Hb1 = [118, -106], Hb2 = [82, -100];
+  const F = [105, 55], Bf = [105, 143];             // rueda delantera
+  const lin = (a, b, n) => sampleLine(a[0], a[1], b[0], b[1], n || 16);
+  const t = [];
+  t.push(sampleArc(BB[0], BB[1], 18, 0, TAU, 44));  // piñón
+  t.push(lin([18, 55], BB, 5));                     // cierra el piñón
+  t.push(lin(BB, Br));                              // tirante hacia la rueda trasera
+  t.push(sampleArc(-105, 55, 88, Math.PI / 2, Math.PI / 2 + TAU, 170)); // rueda trasera
+  t.push(lin(Br, hubR, 8));                         // radio
+  t.push(lin(hubR, S));                             // vaina superior
+  t.push(lin(S, Stip, 8));                          // silla
+  t.push(lin(Stip, S, 8));
+  t.push(lin(S, BB));                               // tubo de sillín
+  t.push(lin(BB, H));                               // tubo diagonal
+  t.push(lin(H, Hb1, 9));                           // manubrio
+  t.push(lin(Hb1, Hb2, 9));
+  t.push(lin(Hb2, H, 9));
+  t.push(lin(H, F));                                // horquilla
+  t.push(lin(F, Bf, 8));                            // radio
+  t.push(sampleArc(105, 55, 88, Math.PI / 2, Math.PI / 2 + TAU, 170)); // rueda delantera
+  return t;
+}
+
+const FIGURAS = {
+  bicicleta() {
+    return biciTrazos();
+  },
+  pelicano() {
+    // Silueta del ave en UN solo trazo cerrado, empezando por el vientre (que es
+    // lo más cercano a la bicicleta): pico, ojo, nuca, espalda, cola y el ala
+    // como lóbulo. Las "patas" son los enlaces entre el ave y los pedales, así
+    // que la figura completa es prácticamente un único trazo continuo.
+    const ave = splineCerrada([
+      [-4, -112], [34, -146], [52, -172], [80, -216], [112, -228], [134, -232],
+      [190, -240], [150, -248], [120, -260], [106, -245], [97, -256], [74, -248],
+      [32, -222], [-12, -188], [-60, -172], [-108, -182], [-150, -146], [-104, -120],
+      [-50, -114], [30, -138], [-6, -176], [-46, -142], [-6, -126]
+    ], 320);
+    return [
+      ave,
+      sampleLine(-4, -112, 0, 50, 26),     // pata que baja al pedal
+      ...biciTrazos(),                     // la bicicleta, en un solo trazo
+      sampleLine(0, 55, 4, -110, 26)       // segunda pata: sube y cierra la figura
+    ];
+  },
+  corazon() {
+    const pts = [];
+    for (let i = 0; i < 400; i++) {
+      const a = (i / 400) * TAU;
+      const x = 16 * Math.pow(Math.sin(a), 3);
+      const y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+      pts.push([x * 11, -y * 11]);
+    }
+    return [pts];
+  },
+  estrella() {
+    const pts = [];
+    const R = 200, r = 78;
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rad = i % 2 === 0 ? R : r;
+      const sig = -Math.PI / 2 + ((i + 1) * Math.PI) / 5;
+      const radSig = (i + 1) % 2 === 0 ? R : r;
+      pts.push(...sampleLine(rad * Math.cos(a), rad * Math.sin(a),
+                             radSig * Math.cos(sig), radSig * Math.sin(sig), 22));
+    }
+    return [pts];
+  },
+  infinito() {
+    const pts = [];
+    for (let i = 0; i < 400; i++) {
+      const a = (i / 400) * TAU;
+      pts.push([200 * Math.sin(a), 130 * Math.sin(a) * Math.cos(a)]);
+    }
+    return [pts];
+  },
+  cardioide() {
+    const pts = [];
+    for (let i = 0; i < 400; i++) {
+      const a = (i / 400) * TAU;
+      const r = 78 * (1 + Math.cos(a));
+      pts.push([r * Math.cos(a) - 78, r * Math.sin(a)]);
+    }
+    return [pts];
+  },
+  rosa() {
+    const pts = [];
+    for (let i = 0; i < 500; i++) {
+      const a = (i / 500) * Math.PI;
+      const r = 195 * Math.sin(5 * a);
+      pts.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    return [pts];
+  },
+  cuadrado() {
+    const s = 150, radio = 46;
+    const t = [];
+    t.push(sampleLine(-s + radio, -s, s - radio, -s, 40));
+    t.push(sampleArc(s - radio, -s + radio, radio, -Math.PI / 2, 0, 24));
+    t.push(sampleLine(s, -s + radio, s, s - radio, 40));
+    t.push(sampleArc(s - radio, s - radio, radio, 0, Math.PI / 2, 24));
+    t.push(sampleLine(s - radio, s, -s + radio, s, 40));
+    t.push(sampleArc(-s + radio, s - radio, radio, Math.PI / 2, Math.PI, 24));
+    t.push(sampleLine(-s, s - radio, -s, -s + radio, 40));
+    t.push(sampleArc(-s + radio, -s + radio, radio, Math.PI, 1.5 * Math.PI, 24));
+    return t;
+  }
+};
+/* ==== FIN FIGURAS ==== */
+
+const PUNTOS = 512;          // muestras de la curva (resolución de la DFT)
+const CAJA = 400;            // la figura se normaliza a esta caja
+const FRACCION_INICIAL = 0.6; // armónicos activos al cargar (60 % del total)
+const TAU_F = Math.PI * 2;
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const eEpis = document.getElementById('eEpis');
+const eEner = document.getElementById('eEner');
+const eError = document.getElementById('eError');
+const eFase = document.getElementById('eFase');
+const eAvance = document.getElementById('eAvance');
+const ePuntos = document.getElementById('ePuntos');
+const eM = document.getElementById('eM');
+const eVel = document.getElementById('eVel');
+const tabla = document.getElementById('tabla');
+const pista = document.getElementById('pista');
+const rangoM = document.getElementById('rangoM');
+const rangoVel = document.getElementById('rangoVel');
+const selFigura = document.getElementById('selFigura');
+const btnPlay = document.getElementById('btnPlay');
+const btnReset = document.getElementById('btnReset');
+const btnDibujar = document.getElementById('btnDibujar');
+const btnCamCompleta = document.getElementById('btnCamCompleta');
+const btnCamSeguir = document.getElementById('btnCamSeguir');
+const cCirculos = document.getElementById('cCirculos');
+const cVectores = document.getElementById('cVectores');
+const cFigura = document.getElementById('cFigura');
+const cRejilla = document.getElementById('cRejilla');
+
+let curva = [];        // puntos de la figura
+let coef = [];         // coeficientes ordenados por radio
+let M = 120;
+let t = 0;
+let jugando = true;
+let seguir = false;
+let velocidad = 1;
+let rastro = [];
+let trazos = [];
+let dibujando = false;
+let modoDibujo = false;
+
+function cargarFigura(nombre) {
+  const bruto = FIGURAS[nombre] ? FIGURAS[nombre]() : [curva];
+  const norm = normalizar(bruto, CAJA);
+  curva = muestrearCerrada(norm, PUNTOS);
+  coef = dft(curva);
+  rangoM.max = String(coef.length);
+  M = Math.max(2, Math.round(coef.length * FRACCION_INICIAL));
+  rangoM.value = String(M);
+  t = 0; rastro = [];
+  actualizarTodo();
+}
+
+function actualizarTodo() {
+  ePuntos.textContent = String(curva.length);
+  eM.textContent = `${M} / ${coef.length}`;
+  eEpis.textContent = String(Math.min(M, coef.length));
+  eEner.textContent = energiaPct(coef, M).toFixed(2) + '%';
+  eError.textContent = errorSumaParcial(curva, coef, M).toFixed(2) + ' px';
+  eVel.textContent = velocidad.toFixed(2) + 'x';
+  tabla.innerHTML = '';
+  for (let i = 0; i < Math.min(8, coef.length); i++) {
+    const c = coef[i];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>n = ${c.n >= 0 ? '+' + c.n : c.n}</td>` +
+                   `<td>${c.amp.toFixed(1)}</td>` +
+                   `<td>${c.fase.toFixed(2)}</td>`;
+    tabla.appendChild(tr);
+  }
+}
+
+function ajustarLienzo() {
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.round(r.width * dpr));
+  cv.height = Math.max(1, Math.round(r.height * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', ajustarLienzo);
+
+function figuraObjetivo() {
+  if (curva.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(curva[0][0], curva[0][1]);
+  for (let i = 1; i < curva.length; i++) ctx.lineTo(curva[i][0], curva[i][1]);
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(255,209,102,.22)';
+  ctx.lineWidth = 1.6 / escalaActual;
+  ctx.setLineDash([6 / escalaActual, 6 / escalaActual]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+let escalaActual = 1;
+
+function render() {
+  const r = cv.parentElement.getBoundingClientRect();
+  const W = r.width, H = r.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const base = Math.min(W / (CAJA * 1.35), H / (CAJA * 1.35));
+  const zoom = seguir ? 3.5 : 1;
+  const escala = base * zoom;
+  escalaActual = escala;
+  const usar = Math.min(M, coef.length);
+
+  // Cadena de vectores
+  let x = 0, y = 0;
+  const cadena = [{ x: 0, y: 0, r: 0 }];
+  for (let i = 0; i < usar; i++) {
+    const c = coef[i];
+    const a = c.n * t + c.fase;
+    const nx = x + c.amp * Math.cos(a);
+    const ny = y + c.amp * Math.sin(a);
+    cadena.push({ x: nx, y: ny, r: c.amp, px: x, py: y });
+    x = nx; y = ny;
+  }
+
+  ctx.save();
+  if (seguir) ctx.translate(W / 2 - x * escala, H / 2 - y * escala);
+  else ctx.translate(W / 2, H / 2);
+  ctx.scale(escala, escala);
+
+  // Rejilla / plano complejo
+  if (cRejilla.checked) {
+    ctx.lineWidth = 1 / escala;
+    ctx.strokeStyle = 'rgba(56,189,248,.08)';
+    const paso = 50;
+    for (let gx = -CAJA; gx <= CAJA; gx += paso) {
+      ctx.beginPath(); ctx.moveTo(gx, -CAJA); ctx.lineTo(gx, CAJA); ctx.stroke();
+    }
+    for (let gy = -CAJA; gy <= CAJA; gy += paso) {
+      ctx.beginPath(); ctx.moveTo(-CAJA, gy); ctx.lineTo(CAJA, gy); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(56,189,248,.3)';
+    ctx.beginPath();
+    ctx.moveTo(-CAJA, 0); ctx.lineTo(CAJA, 0);
+    ctx.moveTo(0, -CAJA); ctx.lineTo(0, CAJA);
+    ctx.stroke();
+  }
+
+  if (cFigura.checked) figuraObjetivo();
+
+  // Círculos de los epiciclos
+  if (cCirculos.checked) {
+    for (let i = 1; i < cadena.length; i++) {
+      const c = cadena[i];
+      if (c.r * escala < 0.5) continue;
+      ctx.beginPath();
+      ctx.arc(c.px, c.py, c.r, 0, TAU_F);
+      ctx.strokeStyle = i <= 10 ? 'rgba(255,209,102,.34)' : 'rgba(0,242,254,.2)';
+      ctx.lineWidth = (i <= 5 ? 1.3 : 0.85) / escala;
+      ctx.stroke();
+    }
+  }
+
+  // Vectores encadenados
+  if (cVectores.checked) {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    for (let i = 1; i < cadena.length; i++) ctx.lineTo(cadena[i].x, cadena[i].y);
+    ctx.strokeStyle = 'rgba(255,209,102,.7)';
+    ctx.lineWidth = 1.2 / escala;
+    ctx.stroke();
+  }
+
+  // Trazo dibujado por la punta
+  if (jugando) {
+    rastro.push([x, y]);
+    if (rastro.length > 4000) rastro.shift();
+  }
+  if (rastro.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(rastro[0][0], rastro[0][1]);
+    for (let i = 1; i < rastro.length; i++) ctx.lineTo(rastro[i][0], rastro[i][1]);
+    ctx.strokeStyle = 'rgba(0,242,254,.95)';
+    ctx.lineWidth = 2.3 / escala;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = '#00f2fe'; ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Punta
+  ctx.beginPath();
+  ctx.arc(x, y, 4.5 / escala, 0, TAU_F);
+  ctx.fillStyle = '#ffd166';
+  ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 15;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  if (jugando) {
+    t += ((TAU_F / 1200) * velocidad);
+    if (t >= TAU_F) t -= TAU_F;
+    eFase.textContent = t.toFixed(2) + ' rad';
+    eAvance.textContent = Math.min(100, Math.round((rastro.length / (1200 / velocidad)) * 100)) + '%';
+  }
+  requestAnimationFrame(render);
+}
+
+/* --- Interacción --- */
+btnPlay.addEventListener('click', () => {
+  jugando = !jugando;
+  btnPlay.textContent = jugando ? '❚❚ Pausar' : '▶ Reproducir';
+  btnPlay.classList.toggle('activo', jugando);
+});
+btnReset.addEventListener('click', () => { t = 0; rastro = []; });
+
+btnDibujar.addEventListener('click', () => {
+  modoDibujo = true;
+  btnDibujar.classList.add('activo');
+  btnDibujar.textContent = '✎ Dibuje en el lienzo…';
+  pista.innerHTML = '<b>Modo dibujo:</b> mantenga presionado el botón del ratón (o arrastre el dedo) ' +
+                    'sobre el lienzo para trazar una figura cerrada; al soltar se calculan sus epiciclos.';
+});
+
+selFigura.addEventListener('change', (e) => {
+  modoDibujo = false;
+  btnDibujar.classList.remove('activo');
+  btnDibujar.textContent = '✎ Dibujar mi trazo';
+  pista.innerHTML = 'Cada círculo gira a frecuencia entera <b>n</b>; encadenando sus vectores, la punta ' +
+                    'dibuja la figura con una sola línea continua. Use <b>Dibujar</b> para trazar su propia curva.';
+  cargarFigura(e.target.value);
+});
+
+rangoM.addEventListener('input', (e) => {
+  M = parseInt(e.target.value, 10);
+  rastro = [];
+  actualizarTodo();
+});
+
+document.querySelectorAll('button.mini').forEach(b => {
+  b.addEventListener('click', () => {
+    const m = Math.min(parseInt(b.dataset.m, 10), coef.length);
+    M = m; rangoM.value = String(m); rastro = [];
+    actualizarTodo();
+  });
+});
+
+rangoVel.addEventListener('input', (e) => {
+  velocidad = parseFloat(e.target.value);
+  eVel.textContent = velocidad.toFixed(2) + 'x';
+});
+
+btnCamCompleta.addEventListener('click', () => {
+  seguir = false;
+  btnCamCompleta.classList.add('activo'); btnCamSeguir.classList.remove('activo');
+});
+btnCamSeguir.addEventListener('click', () => {
+  seguir = true;
+  btnCamSeguir.classList.add('activo'); btnCamCompleta.classList.remove('activo');
+});
+
+/* Dibujo libre */
+function coords(ev) {
+  const r = cv.getBoundingClientRect();
+  const base = Math.min(r.width / (CAJA * 1.35), r.height / (CAJA * 1.35));
+  const cx = r.width / 2, cy = r.height / 2;
+  const px = ev.touches ? ev.touches[0].clientX : ev.clientX;
+  const py = ev.touches ? ev.touches[0].clientY : ev.clientY;
+  return [(px - r.left - cx) / base, (py - r.top - cy) / base];
+}
+cv.addEventListener('pointerdown', (ev) => {
+  if (!modoDibujo) return;
+  dibujando = true;
+  trazos = [[coords(ev)]];
+});
+cv.addEventListener('pointermove', (ev) => {
+  if (!dibujando) return;
+  const p = coords(ev);
+  const ultimo = trazos[trazos.length - 1];
+  const previo = ultimo[ultimo.length - 1];
+  if (Math.hypot(p[0] - previo[0], p[1] - previo[1]) > 2) ultimo.push(p);
+});
+window.addEventListener('pointerup', () => {
+  if (!dibujando) return;
+  dibujando = false;
+  const bruto = trazos[0] || [];
+  if (bruto.length < 12) return;
+  const norm = normalizar([bruto], CAJA);
+  curva = muestrearCerrada(norm, 320);
+  coef = dft(curva);
+  rangoM.max = String(coef.length);
+  M = Math.max(2, Math.round(coef.length * FRACCION_INICIAL));
+  rangoM.value = String(M);
+  t = 0; rastro = [];
+  modoDibujo = false;
+  btnDibujar.classList.remove('activo');
+  btnDibujar.textContent = '✎ Dibujar otro trazo';
+  actualizarTodo();
+});
+
+window.addEventListener('keydown', (ev) => {
+  if (ev.code === 'Space') { ev.preventDefault(); btnPlay.click(); }
+  if (ev.key === 'r' || ev.key === 'R') btnReset.click();
+  if (ev.key === 'd' || ev.key === 'D') btnDibujar.click();
+});
+
+/* Arranque */
+ajustarLienzo();
+cargarFigura('pelicano');
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
